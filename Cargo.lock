@@ -520,7 +520,7 @@ dependencies = [
 [[package]]
 name = "kimai"
 version = "0.1.0"
-source = "git+https://github.com/scattenlaeufer/kimai-rs.git#550df841150fb0843b1c16220ae86c35ceb413ad"
+source = "git+https://github.com/scattenlaeufer/kimai-rs.git#c7547cca37f00ee74d90b209fab7a000889db4a0"
 dependencies = [
  "chrono",
  "clap",
@@ -538,8 +538,11 @@ dependencies = [
 name = "kimai_report"
 version = "0.1.0"
 dependencies = [
+ "clap",
+ "futures",
  "kimai",
  "timewarrior_report",
+ "tokio",
 ]
 
 [[package]]
@@ -1117,7 +1120,7 @@ dependencies = [
 [[package]]
 name = "timewarrior_report"
 version = "0.1.0"
-source = "git+https://github.com/scattenlaeufer/timewarrior-report-rs#786aa5cfe7f24d4601d65df078f3241b00f3e55c"
+source = "git+https://github.com/scattenlaeufer/timewarrior-report-rs#64f7b319e062b3265dbde73f1f38253865f885e4"
 dependencies = [
  "chrono",
  "serde",

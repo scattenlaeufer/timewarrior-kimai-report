@@ -11,3 +11,6 @@ repository = "https://github.com/scattenlaeufer/timewarrior-kimai-report"
 [dependencies]
 timewarrior_report = { git = "https://github.com/scattenlaeufer/timewarrior-report-rs" }
 kimai = { git = "https://github.com/scattenlaeufer/kimai-rs.git" }
+clap = "2.33.3"
+futures = "^0.3"
+tokio = { version = "^1.7", features = ["full"] }
