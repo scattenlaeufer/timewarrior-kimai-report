@@ -2,7 +2,7 @@ use futures::future::try_join_all;
 use kimai::{load_config, log_timesheet_record, Config};
 use std::fmt;
 use std::process::Command;
-use timewarrior_report::{get_data, Session};
+use timewarrior_report::{Session, TimewarriorData};
 
 #[derive(Debug)]
 pub enum ReportError {
@@ -106,13 +106,14 @@ async fn log_session(config: &Config, session: Session) -> Result<(), ReportErro
 #[tokio::main]
 pub async fn run(config_path: Option<String>) -> Result<(), ReportError> {
     let config = load_config(config_path)?;
-    let timewarrior_data = get_data()?;
+    let timewarrior_data = TimewarriorData::from_stdin()?;
 
     let mut future_vec = Vec::new();
     for session in timewarrior_data.sessions {
         future_vec.push(log_session(&config, session))
     }
-    let _results = try_join_all(future_vec).await?;
+    let results = try_join_all(future_vec).await;
+    results?;
 
     Ok(())
 }

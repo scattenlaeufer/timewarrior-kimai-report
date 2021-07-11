@@ -9,7 +9,7 @@ repository = "https://github.com/scattenlaeufer/timewarrior-kimai-report"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-timewarrior_report = { git = "https://github.com/scattenlaeufer/timewarrior-report-rs" }
+timewarrior_report = "0.1.0"
 kimai = { git = "https://github.com/scattenlaeufer/kimai-rs.git" }
 clap = "2.33.3"
 futures = "^0.3"

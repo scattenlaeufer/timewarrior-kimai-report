@@ -489,9 +489,9 @@ dependencies = [
 
 [[package]]
 name = "instant"
-version = "0.1.9"
+version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "61124eeebbd69b8190558df225adf7e4caafce0d743919e5d6b19652314ec5ec"
+checksum = "bee0328b1209d157ef001c94dd85b4f8f64139adb0eac2659f4b08382b2f474d"
 dependencies = [
  "cfg-if",
 ]
@@ -520,7 +520,7 @@ dependencies = [
 [[package]]
 name = "kimai"
 version = "0.1.0"
-source = "git+https://github.com/scattenlaeufer/kimai-rs.git#c7547cca37f00ee74d90b209fab7a000889db4a0"
+source = "git+https://github.com/scattenlaeufer/kimai-rs.git#9be4ba56b66d9dea42caa4a8e710b2a5d05c9284"
 dependencies = [
  "chrono",
  "clap",
@@ -1120,7 +1120,8 @@ dependencies = [
 [[package]]
 name = "timewarrior_report"
 version = "0.1.0"
-source = "git+https://github.com/scattenlaeufer/timewarrior-report-rs#64f7b319e062b3265dbde73f1f38253865f885e4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f8a404e67e5bddf82c895c0af0c033399a48261c253e991b056e699f698589c0"
 dependencies = [
  "chrono",
  "serde",
