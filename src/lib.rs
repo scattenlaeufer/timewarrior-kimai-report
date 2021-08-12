@@ -1,8 +1,11 @@
 use futures::future::try_join_all;
 use kimai::{load_config, log_timesheet_record, Config};
 use std::fmt;
+use std::io::stdin;
 use std::process::Command;
+use std::sync::Arc;
 use timewarrior_report::{Session, TimewarriorData};
+use tokio::sync::Notify;
 
 #[derive(Debug)]
 pub enum ReportError {
@@ -10,6 +13,7 @@ pub enum ReportError {
     Timewarrior(String),
     ParseInt(String),
     IO(String),
+    Join(String),
     Other(String),
 }
 
@@ -22,6 +26,7 @@ impl fmt::Display for ReportError {
             Self::Timewarrior(e) => write!(f, "Timewarrior Error: {}", e),
             Self::ParseInt(e) => write!(f, "Parse Int Error: {}", e),
             Self::IO(e) => write!(f, "IO Error: {}", e),
+            Self::Join(e) => write!(f, "Join Error: {}", e),
             Self::Other(e) => write!(f, "Other Error: {}", e),
         }
     }
@@ -51,6 +56,12 @@ impl From<std::io::Error> for ReportError {
     }
 }
 
+impl From<tokio::task::JoinError> for ReportError {
+    fn from(error: tokio::task::JoinError) -> Self {
+        Self::Join(error.to_string())
+    }
+}
+
 fn parse_kimai_id(input: &str, identifier: &str) -> Result<Option<usize>, ReportError> {
     if input.starts_with(identifier) {
         Ok(Some(input.split(':').collect::<Vec<_>>()[1].parse()?))
@@ -59,7 +70,11 @@ fn parse_kimai_id(input: &str, identifier: &str) -> Result<Option<usize>, Report
     }
 }
 
-async fn log_session(config: &Config, session: Session) -> Result<(), ReportError> {
+async fn log_session(
+    config: &Config,
+    session: Session,
+    notify: Arc<Notify>,
+) -> Result<(), ReportError> {
     let mut kimai_project: Option<usize> = None;
     let mut kimai_activity: Option<usize> = None;
     let mut kimai_id: Option<usize> = None;
@@ -77,26 +92,56 @@ async fn log_session(config: &Config, session: Session) -> Result<(), ReportErro
         }
     }
 
-    if let Some(id) = kimai_id {
-        println!("@{}: already got logged with ID {}", session.id, id);
-    } else if let (Some(project_id), Some(activity_id)) = (kimai_project, kimai_activity) {
-        let record = log_timesheet_record(
-            &config,
-            0,
-            project_id,
-            activity_id,
-            session.start,
-            session.end,
-            session.annotation,
-            Some(tags),
-        )
-        .await?;
-        let _cmd_result = Command::new("timew")
-            .arg("tag")
-            .arg(format!("@{}", session.id))
-            .arg(format!("kimai_id:{}", record.id))
-            .output()?;
-        println!("@{}: logged to Kimai", session.id);
+    if let (Some(project_id), Some(activity_id)) = (kimai_project, kimai_activity) {
+        if let Some(id) = kimai_id {
+            let record = kimai::get_timesheet_record(&config, id).await?;
+            //dbg!(&record, &session);
+            if record.compare_data(
+                project_id,
+                activity_id,
+                session.start,
+                session.end,
+                session.annotation,
+                tags,
+            ) {
+                notify.notified().await;
+                println!("@{}: already got logged with ID {}", session.id, id);
+            } else {
+                notify.notified().await;
+                println!(
+                    "@{}: something is different! [(l)ocal|(r)emote|(s)kip]",
+                    session.id
+                );
+                let answer = tokio::task::spawn_blocking(|| -> Result<String, ReportError> {
+                    let mut input = String::new();
+                    stdin().read_line(&mut input)?;
+                    Ok(input.trim().to_string())
+                })
+                .await??;
+                dbg!(answer);
+            }
+            notify.notify_one();
+        } else {
+            let record = log_timesheet_record(
+                &config,
+                0,
+                project_id,
+                activity_id,
+                session.start,
+                session.end,
+                session.annotation,
+                Some(tags),
+            )
+            .await?;
+            let _cmd_result = Command::new("timew")
+                .arg("tag")
+                .arg(format!("@{}", session.id))
+                .arg(format!("kimai_id:{}", record.id))
+                .output()?;
+            notify.notified().await;
+            println!("@{}: logged to Kimai", session.id);
+            notify.notify_one();
+        }
     } else {
         println!("@{}: required IDs not found!", session.id);
     }
@@ -108,10 +153,12 @@ pub async fn run(config_path: Option<String>) -> Result<(), ReportError> {
     let config = load_config(config_path)?;
     let timewarrior_data = TimewarriorData::from_stdin()?;
 
+    let print_notify = Arc::new(Notify::new());
     let mut future_vec = Vec::new();
     for session in timewarrior_data.sessions {
-        future_vec.push(log_session(&config, session))
+        future_vec.push(log_session(&config, session, print_notify.clone()))
     }
+    print_notify.notify_one();
     let results = try_join_all(future_vec).await;
     results?;
 
