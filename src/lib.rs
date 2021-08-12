@@ -73,7 +73,8 @@ fn parse_kimai_id(input: &str, identifier: &str) -> Result<Option<usize>, Report
 async fn log_session(
     config: &Config,
     session: Session,
-    notify: Arc<Notify>,
+    print_notify: Arc<Notify>,
+    timew_notify: Arc<Notify>,
 ) -> Result<(), ReportError> {
     let mut kimai_project: Option<usize> = None;
     let mut kimai_activity: Option<usize> = None;
@@ -104,10 +105,10 @@ async fn log_session(
                 session.annotation,
                 tags,
             ) {
-                notify.notified().await;
+                print_notify.notified().await;
                 println!("@{}: already got logged with ID {}", session.id, id);
             } else {
-                notify.notified().await;
+                print_notify.notified().await;
                 println!(
                     "@{}: something is different! [(l)ocal|(r)emote|(s)kip]",
                     session.id
@@ -120,7 +121,7 @@ async fn log_session(
                 .await??;
                 dbg!(answer);
             }
-            notify.notify_one();
+            print_notify.notify_one();
         } else {
             let record = log_timesheet_record(
                 &config,
@@ -133,14 +134,16 @@ async fn log_session(
                 Some(tags),
             )
             .await?;
+            timew_notify.notified().await;
             let _cmd_result = Command::new("timew")
                 .arg("tag")
                 .arg(format!("@{}", session.id))
                 .arg(format!("kimai_id:{}", record.id))
                 .output()?;
-            notify.notified().await;
+            timew_notify.notify_one();
+            print_notify.notified().await;
             println!("@{}: logged to Kimai", session.id);
-            notify.notify_one();
+            print_notify.notify_one();
         }
     } else {
         println!("@{}: required IDs not found!", session.id);
@@ -154,11 +157,18 @@ pub async fn run(config_path: Option<String>) -> Result<(), ReportError> {
     let timewarrior_data = TimewarriorData::from_stdin()?;
 
     let print_notify = Arc::new(Notify::new());
+    let timew_notify = Arc::new(Notify::new());
     let mut future_vec = Vec::new();
     for session in timewarrior_data.sessions {
-        future_vec.push(log_session(&config, session, print_notify.clone()))
+        future_vec.push(log_session(
+            &config,
+            session,
+            print_notify.clone(),
+            timew_notify.clone(),
+        ))
     }
     print_notify.notify_one();
+    timew_notify.notify_one();
     let results = try_join_all(future_vec).await;
     results?;
 
