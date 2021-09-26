@@ -95,7 +95,16 @@ async fn log_session(
 
     if let (Some(project_id), Some(activity_id)) = (kimai_project, kimai_activity) {
         if let Some(id) = kimai_id {
-            let record = kimai::get_timesheet_record(&config, id).await?;
+            let record = match kimai::get_timesheet_record(config, id).await {
+                Ok(r) => r,
+                Err(e) => {
+                    println!(
+                        "@{}: Error getting Kimai session with Kimai ID {}: {}",
+                        session.id, id, e
+                    );
+                    return Ok(());
+                }
+            };
             //dbg!(&record, &session);
             if record.compare_data(
                 project_id,
@@ -123,27 +132,34 @@ async fn log_session(
             }
             print_notify.notify_one();
         } else {
-            let record = log_timesheet_record(
-                &config,
+            match log_timesheet_record(
+                config,
                 0,
                 project_id,
                 activity_id,
                 session.start,
                 session.end,
-                session.annotation,
+                session.annotation.clone(),
                 Some(tags),
             )
-            .await?;
-            timew_notify.notified().await;
-            let _cmd_result = Command::new("timew")
-                .arg("tag")
-                .arg(format!("@{}", session.id))
-                .arg(format!("kimai_id:{}", record.id))
-                .output()?;
-            timew_notify.notify_one();
-            print_notify.notified().await;
-            println!("@{}: logged to Kimai", session.id);
-            print_notify.notify_one();
+            .await
+            {
+                Ok(record) => {
+                    timew_notify.notified().await;
+                    let _cmd_result = Command::new("timew")
+                        .arg("tag")
+                        .arg(format!("@{}", session.id))
+                        .arg(format!("kimai_id:{}", record.id))
+                        .output()?;
+                    timew_notify.notify_one();
+                    print_notify.notified().await;
+                    println!("@{}: logged to Kimai", session.id);
+                    print_notify.notify_one();
+                }
+                Err(e) => {
+                    println!("Error processeing some session: {}\n{:#?}", &e, &session);
+                }
+            };
         }
     } else {
         println!("@{}: required IDs not found!", session.id);
